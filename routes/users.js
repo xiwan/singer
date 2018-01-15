@@ -3,6 +3,7 @@ var router = express.Router();
 var _ = require('lodash');
 
 var utils = require('../utils/utils.js');
+var connstant = require('../utils/const.js');
 var masterdata = require('../utils/masterdata.js');
 var redisClient = require('../utils/redisClient.js');
 
@@ -14,18 +15,58 @@ router.get('/', function(req, res, next) {
 
 
 router.post('/tips', function(req, res, next){
-	var itemApiPath = utils.getItemApiPath(req.app.get('env'));
-
-	
 	var data = req.body;
 	var singerId = data.singerId;
 	var songId = data.songId;
 	var giftId = data.giftId;
-	var uid = data.uid;
+	var openkey = data.openkey;
+	var openid = data.openid;
+
+	var itemApiPath = utils.getItemApiPath(req.app.get('env'));
+	var cmd =  1;
+	var mask = 1;
+	var params = [
+	  	  {'key': 'cmd', 'value': cmd}, 
+	  	  {'key': 'mask', 'value': mask}, 
+		  {'key': 'appid', 'value': connstant.app.id}, 
+		  {'key': 'gameid', 'value': connstant.game.id}, 
+		  {'key': 'openkey', 'value': openkey},
+		  {'key': 'openid', 'value': openid},
+		  {'key': 'ts', 'value': Math.floor(new Date() / 1000)},
+		  {'key': 'rnd', 'value': Math.floor(new Date() / 1000)}
+	];
+
+	var sig = utils.sigGenerator('POST', itemApiPath, params, connstant.app.key);
+	if (sig && itemApiPath) {
+	  	utils.itemProxy(itemApiPath, params, sig, function(data){
+	  	  	res.send(data);
+	  	});
+	}
+
+	var uid = openid;
+	if (!uid) {
+		var err = new Error('not-valid-user');
+		next(err);
+		return;
+	}
+
+	var filterSingerArray = _.filter(masterdata.singers, function(o) { return o.id == singerId; });
+	if (filterSingerArray == null || filterSingerArray.length == 0) {
+		var err = new Error('not-found-singer');
+		next(err);
+		return;
+	}
+
+	var filterSongArray = _.filter(masterdata.songs, function(o) { return o.id == songId; });
+	if (filterSongArray == null || filterSongArray.length == 0) {
+		var err = new Error('not-found-song');
+		next(err);
+		return;
+	}
 
 	var filterGiftArray = _.filter(masterdata.gifts, function(o) { return o.id == giftId; });
 	if (filterGiftArray == null || filterGiftArray.length == 0) {
-		var err = new Error('Not Found');
+		var err = new Error('not-found-gift');
 		next(err);
 		return;
 	}
@@ -33,11 +74,10 @@ router.post('/tips', function(req, res, next){
 
 	var args = [ 'singer' + singerId ];
 	args = _.concat(args, [point, uid]);
-	console.log(args);
-	redisClient.zadd(args, function (err, response) {
+	redisClient.zincrby(args, function(err, response) {
 		if (err) throw err;
     	console.log('added '+response+' items.');
-	});
+	})
 
 	res.send(data);
 
