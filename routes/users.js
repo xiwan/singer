@@ -21,7 +21,7 @@ router.post('/tips', function(req, res, next){
 	var giftId = data.giftId;
 	var openkey = data.openkey;
 	var openid = data.openid;
-
+	console.log(req.app.get('env'));
 	var itemApiPath = utils.getItemApiPath(req.app.get('env'));
 	var cmd =  1;
 	var mask = 1;
