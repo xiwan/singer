@@ -7,6 +7,35 @@ var request = require('request');
 
 var utils = {};
 
+utils.validateParam = function(oldValue, defaultValue) {
+	console.log(arguments)
+	if (!_.isNil(defaultValue)) {
+		if (oldValue == null || oldValue == '') {
+			oldValue = defaultValue+''; // default type string
+		}
+	}else {
+		if (_.isString(oldValue) || _.isNumber(oldValue)) {
+			if (_.isNil(oldValue)) {
+				var err = new Error('validate failed');
+				throw err;
+			}
+		}
+
+		if (_.isArray(oldValue)) {
+			if (_.isEmpty(oldValue)) {
+				var err = new Error('validate failed');
+				throw err;
+			}
+		}
+	}
+	return oldValue;
+};
+
+utils.yearWeek = function() {
+	var weekNum = (((new Date())-(new Date("2017-01-01")))/(24*60*60*7*1000)|0) + 1;
+	return (new Date()).getFullYear() + '' + ((weekNum < 10) ? '0' + weekNum : weekNum);
+};
+
 utils.getAuthApiPath = function (env) {
 	return connstant.auth.getAuthApiPath(connstant.auth.require, env);
 };

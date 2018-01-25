@@ -1,13 +1,14 @@
 var express = require('express');
 var router = express.Router();
 var _ = require('lodash');
+var async = require('async');
 
 var utils = require('../utils/utils.js');
-var connstant = require('../utils/const.js');
+var constant = require('../utils/const.js');
 var masterdata = require('../utils/masterdata.js');
 var redisClient = require('../utils/redisClient.js');
 
-
+module.exports = router;
 /* GET users listing. */
 router.get('/', function(req, res, next) {
   res.send('respond with a resource');
@@ -16,70 +17,68 @@ router.get('/', function(req, res, next) {
 
 router.post('/tips', function(req, res, next){
 	var data = req.body;
-	var singerId = data.singerId;
-	var songId = data.songId;
-	var giftId = data.giftId;
-	var openkey = data.openkey;
-	var openid = data.openid;
-	console.log(req.app.get('env'));
-	var itemApiPath = utils.getItemApiPath(req.app.get('env'));
-	var cmd =  1;
-	var mask = 1;
-	var params = [
-	  	  {'key': 'cmd', 'value': cmd}, 
-	  	  {'key': 'mask', 'value': mask}, 
-		  {'key': 'appid', 'value': connstant.app.id}, 
-		  {'key': 'gameid', 'value': connstant.game.id}, 
-		  {'key': 'openkey', 'value': openkey},
-		  {'key': 'openid', 'value': openid},
-		  {'key': 'ts', 'value': Math.floor(new Date() / 1000)},
-		  {'key': 'rnd', 'value': Math.floor(new Date() / 1000)}
-	];
+	try {
+		var songId = data.songId;
+		var singerId = utils.validateParam(data.singerId);
+		var giftId = utils.validateParam(data.giftId);
+		var openkey = utils.validateParam(data.openkey);
+		var openid = utils.validateParam(data.openid);
 
-	var sig = utils.sigGenerator('POST', itemApiPath, params, connstant.app.key);
-	if (sig && itemApiPath) {
-	  	utils.itemProxy(itemApiPath, params, sig, function(data){
-	  	  	res.send(data);
-	  	});
-	}
+		var itemApiPath = utils.getItemApiPath(req.app.get('env'));
+		var cmd =  1;
+		var mask = 1;
+		var params = [
+		  	  {'key': 'cmd', 'value': cmd}, 
+		  	  {'key': 'mask', 'value': mask}, 
+			  {'key': 'appid', 'value': constant.app.id}, 
+			  {'key': 'gameid', 'value': constant.game.id}, 
+			  {'key': 'openkey', 'value': openkey},
+			  {'key': 'openid', 'value': openid},
+			  {'key': 'ts', 'value': Math.floor(new Date() / 1000)},
+			  {'key': 'rnd', 'value': Math.floor(new Date() / 1000)}
+		];
 
-	var uid = openid;
-	if (!uid) {
-		var err = new Error('not-valid-user');
+		var sig = utils.sigGenerator('POST', itemApiPath, params, constant.app.key);
+		if (sig && itemApiPath) {
+		  	utils.itemProxy(itemApiPath, params, sig, function(data){
+		  	  	res.send(data);
+		  	});
+		}
+
+		var uid = openid;
+
+		var filterSingerArray = utils.validateParam(
+			_.filter(masterdata.singers, function(o) { return o.id == singerId; }));
+
+		var filterGiftArray = utils.validateParam(
+			_.filter(masterdata.gifts, function(o) { return o.id == giftId; }));
+		var point = filterGiftArray[0].point;
+
+		// should use async parallel
+		async.parallel([
+		    function(callback) {
+				var singerBoardName = 'SingersRanking';
+				var singerArgs = _.concat([singerBoardName], [point, singerId]);
+				redisClient.zincrby(singerArgs, callback);
+		    },
+		    function(callback) {
+				var userBoardName = 'Contribution' + utils.yearWeek();
+				var userArgs = _.concat([userBoardName], [point, uid]);
+				redisClient.zincrby(userArgs, callback);
+		    }
+		],
+		// optional callback
+		function(err, results) {
+		    if (err) throw err;
+		    console.log(results);
+
+		    res.send(JSON.stringify(data));
+		});
+
+	} catch (err) {
 		next(err);
-		return;
 	}
 
-	var filterSingerArray = _.filter(masterdata.singers, function(o) { return o.id == singerId; });
-	if (filterSingerArray == null || filterSingerArray.length == 0) {
-		var err = new Error('not-found-singer');
-		next(err);
-		return;
-	}
-
-	var filterSongArray = _.filter(masterdata.songs, function(o) { return o.id == songId; });
-	if (filterSongArray == null || filterSongArray.length == 0) {
-		var err = new Error('not-found-song');
-		next(err);
-		return;
-	}
-
-	var filterGiftArray = _.filter(masterdata.gifts, function(o) { return o.id == giftId; });
-	if (filterGiftArray == null || filterGiftArray.length == 0) {
-		var err = new Error('not-found-gift');
-		next(err);
-		return;
-	}
-	var point = filterGiftArray[0].point;
-
-	var args = [ 'singer' + singerId ];
-	args = _.concat(args, [point, uid]);
-	redisClient.zincrby(args, function(err, response) {
-		if (err) throw err;
-    	console.log('added '+response+' items.');
-	})
-
-	res.send(data);
 
 });
 
@@ -92,6 +91,3 @@ router.post('/score', function(req, res, next){
 	res.send(data);
 
 });
-
-
-module.exports = router;
