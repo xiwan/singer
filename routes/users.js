@@ -16,8 +16,8 @@ router.get('/', function(req, res, next) {
 
 
 router.post('/tips', function(req, res, next){
-	var data = req.body;
-	try {
+	utils.protectBlock(function(req, res, next){
+		var data = req.body;
 		var songId = data.songId;
 		var singerId = utils.validateParam(data.singerId);
 		var giftId = utils.validateParam(data.giftId);
@@ -75,10 +75,7 @@ router.post('/tips', function(req, res, next){
 		    res.send(JSON.stringify(data));
 		});
 
-	} catch (err) {
-		next(err);
-	}
-
+	}, arguments, next);
 
 });
 

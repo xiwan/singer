@@ -11,7 +11,8 @@ module.exports = router;
 
 /* GET home page. */
 router.post('/login', function(req, res, next) {
-  try {
+  utils.protectBlock(function(req, res, next){
+
     var openkey = utils.validateParam(req.body.openkey, '1');
     var openid = utils.validateParam(req.body.openid, '2');
    
@@ -32,8 +33,8 @@ router.post('/login', function(req, res, next) {
         });
     }
     res.send({"ret":0,"data":{},"msg":""});    
-  } catch (err) {
-    next(err);
-  }
+
+  }, arguments, next);
+
 
 });

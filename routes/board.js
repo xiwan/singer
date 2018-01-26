@@ -11,7 +11,8 @@ var redisClient = require('../utils/redisClient.js');
 module.exports = router;
 
 router.get('/contribution/week', function(req, res, next){
-	try {
+	utils.protectBlock(function(req, res, next){
+
 		var week = utils.validateParam(req.query.week, utils.yearWeek());
 		var user = utils.validateParam(req.query.user, ''); // default empty
 		var singerId = utils.validateParam(req.query.singerId, '');// default empty
@@ -19,7 +20,7 @@ router.get('/contribution/week', function(req, res, next){
 		var userBoardName = 'Contribution' + week;
 		var userArgs = _.concat([userBoardName], ['0', '+inf', 'WITHSCORES', 'LIMIT', '0', '9']);
 		redisClient.zrangebyscore(userArgs, function(err, results){
-			if (err) next(err);
+			if (err) throw err;
 			var userArray = [];
 			for (var i = 0; i< results.length; i+=2) {
 				var userObj = {};
@@ -31,15 +32,26 @@ router.get('/contribution/week', function(req, res, next){
 			
 		});
 
-	} catch (err) {
-		next(err);
-	}
-
-
+	}, arguments, next);
 });
 
 router.get('/popularity', function(req, res, next){
-
+	utils.protectBlock(function(req, res, next){
+		var singerBoardName = 'SingersRanking';
+		var singerArgs = _.concat([singerBoardName], ['0', '+inf', 'WITHSCORES', 'LIMIT', '0', '9']);
+		redisClient.zrangebyscore(singerArgs, function(err, results){
+			if (err) throw err;
+			var singerArray = [];
+			for (var i = 0; i< results.length; i+=2) {
+				var singerObj = {};
+				singerObj.singerId = results[i];
+				singerObj.point = results[i+1];
+				singerArray.push(singerObj);
+			}
+			res.send(JSON.stringify(singerArray));
+			
+		});
+	}, arguments, next);
 });
 
 

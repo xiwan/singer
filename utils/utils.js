@@ -7,26 +7,36 @@ var request = require('request');
 
 var utils = {};
 
+utils.protectBlock = function(handler, params, next){
+	try {
+		handler.apply(null, params);
+	} catch (err) {
+		console.log(err);
+		next(err);
+	}
+};
+
 utils.validateParam = function(oldValue, defaultValue) {
-	console.log(arguments)
+	
 	if (!_.isNil(defaultValue)) {
 		if (oldValue == null || oldValue == '') {
 			oldValue = defaultValue+''; // default type string
 		}
 	}else {
-		if (_.isString(oldValue) || _.isNumber(oldValue)) {
+		if (_.isNil(oldValue)) {
+			var err = new Error('validate failed');
+			throw err;
+		}else if (_.isString(oldValue) || _.isNumber(oldValue)) {
 			if (_.isNil(oldValue)) {
 				var err = new Error('validate failed');
 				throw err;
 			}
-		}
-
-		if (_.isArray(oldValue)) {
+		}else if (_.isArray(oldValue)) {
 			if (_.isEmpty(oldValue)) {
 				var err = new Error('validate failed');
 				throw err;
 			}
-		}
+		} 
 	}
 	return oldValue;
 };
